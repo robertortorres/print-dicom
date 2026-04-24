@@ -1,0 +1,8 @@
+flask==3.0.3
+flask-cors==4.0.1
+pydicom==2.4.4
+Pillow==10.4.0
+numpy==1.26.4
+reportlab==4.2.2
+gunicorn==22.0.0
+psycopg2-binary==2.9.9

@@ -1,0 +1,57 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: dicom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       dicomlaudo
+      POSTGRES_USER:     dicom
+      POSTGRES_PASSWORD: dicom123
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dicom -d dicomlaudo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    container_name: dicom-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST:     db
+      POSTGRES_PORT:     5432
+      POSTGRES_DB:       dicomlaudo
+      POSTGRES_USER:     dicom
+      POSTGRES_PASSWORD: dicom123
+    volumes:
+      - dicom-files:/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build: ./frontend
+    container_name: dicom-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    driver: local
+  dicom-files:
+    driver: local
+

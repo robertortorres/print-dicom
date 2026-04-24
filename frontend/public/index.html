@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Laudos DICOM</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue-dark: #1a3a5c;
+    --blue-mid: #2563a8;
+    --blue-light: #e8eef5;
+    --accent: #2563a8;
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #f7f8fa;
+    --border: #e2e6eb;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --text-light: #9ca3af;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Layout */
+  .app-shell { display: flex; flex-direction: column; height: 100vh; }
+
+  .topbar {
+    background: var(--blue-dark);
+    color: white;
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar-logo svg { width: 28px; height: 28px; opacity: 0.9; }
+  .topbar-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-subtitle { font-size: 11px; opacity: 0.6; font-weight: 400; }
+  .topbar-spacer { flex: 1; }
+  .topbar-badge {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 99px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .main-layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding: 12px 0;
+  }
+  .nav-section { padding: 4px 12px 2px; font-size: 10px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; cursor: pointer; color: var(--text-muted);
+    font-size: 13px; font-weight: 500; border-radius: 0;
+    transition: all 0.15s; position: relative; user-select: none;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--blue-light); color: var(--blue-dark); font-weight: 600; }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--blue-dark); border-radius: 0 2px 2px 0;
+  }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.7; }
+  .nav-item.active svg { opacity: 1; }
+  .nav-badge {
+    margin-left: auto; background: var(--blue-dark); color: white;
+    font-size: 10px; padding: 1px 6px; border-radius: 99px; min-width: 18px; text-align: center;
+  }
+
+  /* Content area */
+  .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2);
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-subtitle { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+  .card-body { padding: 20px; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+  }
+  .upload-zone:hover { border-color: var(--blue-mid); background: var(--blue-light); }
+  .upload-zone.drag { border-color: var(--blue-mid); background: var(--blue-light); transform: scale(1.01); }
+  .upload-icon { font-size: 40px; margin-bottom: 10px; }
+  .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+  .upload-sub { font-size: 13px; color: var(--text-muted); }
+  .upload-formats { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+  .format-tag {
+    background: var(--blue-dark); color: white; padding: 2px 8px;
+    border-radius: 4px; font-size: 11px; font-weight: 600; font-family: monospace;
+  }
+
+  /* Controls */
+  .controls-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); margin: 16px 0;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; }
+  .ctrl-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-weight: 500; }
+  .ctrl-val {
+    font-size: 12px; font-weight: 600; min-width: 36px; text-align: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 4px; color: var(--blue-dark);
+  }
+  input[type=range] {
+    width: 110px; height: 4px; cursor: pointer;
+    accent-color: var(--blue-dark);
+  }
+  .ctrl-divider { width: 1px; height: 20px; background: var(--border); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); transition: all 0.15s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); border-color: #c5ccd5; }
+  .btn:active { transform: scale(0.98); }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary { background: var(--blue-dark); color: white; border-color: var(--blue-dark); }
+  .btn-primary:hover { background: #142d48; border-color: #142d48; }
+  .btn-success { background: var(--success); color: white; border-color: var(--success); }
+  .btn-success:hover { background: #15803d; }
+  .btn-danger { color: var(--danger); border-color: #fca5a5; }
+  .btn-danger:hover { background: #fef2f2; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 6px; }
+
+  /* Image grid */
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .img-card {
+    border: 1.5px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; transition: all 0.15s;
+    background: #000; position: relative;
+    user-select: none;
+  }
+  .img-card:hover { border-color: var(--blue-mid); box-shadow: var(--shadow-md); }
+  .img-card.drag-over {
+    border-color: var(--blue-mid); border-style: dashed; border-width: 2px;
+    transform: scale(1.03); box-shadow: var(--shadow-md);
+  }
+  .img-card.dragging { opacity: 0.35; transform: scale(0.97); }
+
+  /* Drag handle top bar */
+  .img-drag-handle {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 26px; cursor: grab; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 6px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .img-card:hover .img-drag-handle { opacity: 1; }
+  .img-drag-handle:active { cursor: grabbing; }
+  .drag-dots {
+    display: grid; grid-template-columns: repeat(3,4px); gap: 2px;
+  }
+  .drag-dots span {
+    display: block; width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.8);
+  }
+  .img-order-badge {
+    font-size: 10px; font-weight: 700; color: white;
+    background: rgba(0,0,0,0.5); border-radius: 4px;
+    padding: 1px 5px; line-height: 1.4;
+  }
+
+  /* Delete button overlay */
+  .img-delete-btn {
+    position: absolute; top: 4px; right: 4px; z-index: 3;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(220,38,38,0.85); color: white;
+    border: none; cursor: pointer; font-size: 13px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s, transform 0.1s;
+    font-weight: 700;
+  }
+  .img-card:hover .img-delete-btn { opacity: 1; }
+  .img-delete-btn:hover { background: rgba(185,28,28,1); transform: scale(1.1); }
+  .img-delete-btn:active { transform: scale(0.95); }
+
+  .img-card img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: contain; background: #111; cursor: zoom-in; }
+  .img-card-bar {
+    padding: 5px 8px; background: var(--surface2);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .img-card-name { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .img-card-num { font-size: 10px; font-weight: 700; color: var(--blue-dark); flex-shrink: 0; }
+  .img-loading {
+    position: absolute; inset: 0; background: #111;
+    display: flex; align-items: center; justify-content: center; color: #555; font-size: 12px;
+  }
+
+  /* Report form */
+  .report-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-field { display: flex; flex-direction: column; gap: 4px; }
+  .form-field.full { grid-column: 1/-1; }
+  .form-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .form-input {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 13px; color: var(--text); background: var(--surface);
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .form-input:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(37,99,168,0.1); }
+  textarea.form-input { resize: vertical; min-height: 72px; line-height: 1.5; }
+  select.form-input { cursor: pointer; }
+
+  .form-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* Report Preview */
+  .report-preview-wrap { position: sticky; top: 0; }
+  .report-preview-label { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; }
+  .report-preview {
+    background: white; border-radius: var(--radius);
+    border: 1px solid var(--border); box-shadow: var(--shadow-md);
+    overflow: hidden; font-family: Georgia, serif;
+  }
+  .rp-head {
+    background: var(--blue-dark); color: white;
+    padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .rp-clinic-name { font-size: 13px; font-weight: 700; }
+  .rp-exam-type { font-size: 10px; opacity: 0.7; margin-top: 2px; font-family: sans-serif; }
+  .rp-date-label { font-size: 10px; opacity: 0.7; font-family: sans-serif; text-align: right; }
+  .rp-patient-bar {
+    background: #f5f7fa; padding: 8px 16px;
+    border-bottom: 1px solid #dde3ea;
+    display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px;
+  }
+  .rp-field { }
+  .rp-field-key { font-size: 9px; color: #999; font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.5px; }
+  .rp-field-val { font-size: 11px; color: #1a1a1a; font-weight: 600; font-family: sans-serif; margin-top: 1px; }
+  .rp-images-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 16px; }
+  .rp-img-wrap img { width: 100%; display: block; border: 1px solid #ddd; border-radius: 3px; }
+  .rp-img-caption { font-size: 9px; color: #888; font-family: sans-serif; text-align: center; margin-top: 2px; }
+  .rp-section { padding: 8px 16px; border-top: 1px solid #eee; }
+  .rp-section-title { font-size: 9px; color: var(--blue-dark); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; font-family: sans-serif; margin-bottom: 4px; }
+  .rp-section-text { font-size: 11px; color: #333; font-family: sans-serif; line-height: 1.5; }
+  .rp-footer { padding: 8px 16px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; }
+  .rp-signature { text-align: center; }
+  .rp-sig-line { border-top: 1px solid #555; padding-top: 4px; font-size: 10px; color: #444; font-family: sans-serif; font-weight: 600; }
+  .rp-sig-crm { font-size: 9px; color: #888; font-family: sans-serif; margin-top: 1px; }
+
+  /* Histórico */
+  .db-table { width: 100%; border-collapse: collapse; }
+  .db-table th {
+    text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+    background: var(--surface2); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .db-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .db-table tr:last-child td { border-bottom: none; }
+  .db-table tr:hover td { background: var(--surface2); }
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--success); margin-right: 6px; }
+
+  /* States */
+  .empty-state {
+    text-align: center; padding: 48px 24px;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 8px; }
+  .empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: var(--blue-dark); color: white; padding: 12px 20px;
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+    font-size: 13px; font-weight: 500;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--success); }
+
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin: 8px 0; }
+  .progress-fill { height: 100%; background: var(--blue-mid); border-radius: 2px; transition: width 0.3s; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #c0c7d0; }
+
+  .hidden { display: none !important; }
+  .flex-spacer { flex: 1; }
+
+  /* Image viewer modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal-img-wrap { position: relative; max-width: 90vw; max-height: 90vh; }
+  .modal-img-wrap img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: var(--radius); display: block; }
+  .modal-controls {
+    position: absolute; bottom: -48px; left: 0; right: 0;
+    display: flex; gap: 8px; justify-content: center;
+  }
+  .modal-close {
+    position: absolute; top: -44px; right: 0;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: white; border-radius: var(--radius); padding: 6px 12px; cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.2); }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="28" height="28" rx="6" fill="rgba(255,255,255,0.15)"/>
+        <path d="M7 14a7 7 0 1014 0A7 7 0 007 14z" stroke="white" stroke-width="1.5" fill="none"/>
+        <path d="M14 10v4l3 2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="14" cy="14" r="2" fill="white"/>
+      </svg>
+      <div>
+        <div class="topbar-title">DICOM Laudo</div>
+        <div class="topbar-subtitle">Sistema de Geração de Laudos</div>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-badge" id="img-badge">0 imagens</div>
+  </div>
+
+  <div class="main-layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-section">Principal</div>
+      <div class="nav-item active" onclick="goTo('upload')">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 01.354.146l3 3a.5.5 0 01-.708.708L8.5 2.707V10.5a.5.5 0 01-1 0V2.707L5.354 4.854a.5.5 0 11-.708-.708l3-3A.5.5 0 018 1zM1 13.5a.5.5 0 01.5-.5h13a.5.5 0 010 1h-13a.5.5 0 01-.5-.5z"/></svg>
+        Carregar Imagens
+        <span class="nav-badge hidden" id="nav-count">0</span>
+      </div>
+      <div class="nav-item" onclick="goTo('report')">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 4a.5.5 0 000 1h6a.5.5 0 000-1H5zm-.5 2.5A.5.5 0 015 6h6a.5.5 0 010 1H5a.5.5 0 01-.5-.5zM5 8a.5.5 0 000 1h6a.5.5 0 000-1H5zm0 2a.5.5 0 000 1h3a.5.5 0 000-1H5z"/><path d="M2 2a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V2zm10-1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V2a1 1 0 00-1-1z"/></svg>
+        Gerar Laudo
+      </div>
+      <div class="nav-section">Histórico</div>
+      <div class="nav-item" onclick="goTo('history')">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8.515 1.019A7 7 0 008 1V0a8 8 0 01.589.022l-.074.997zm2.004.45a7.003 7.003 0 00-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 00-.439-.27l.493-.87a8.025 8.025 0 01.979.654l-.615.789a6.996 6.996 0 00-.418-.302zm1.834 1.79a6.99 6.99 0 00-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 00-.214-.468l.893-.45a7.976 7.976 0 01.45 1.088l-.95.313a7.023 7.023 0 00-.179-.483zm.53 2.507a6.991 6.991 0 00-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1 .025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 01-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 01-.401.432l-.707-.707z"/><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM4.5 7.5a.5.5 0 01.5-.5h2.5V4.5a.5.5 0 011 0v3a.5.5 0 01-.5.5H5a.5.5 0 01-.5-.5z"/></svg>
+        Histórico
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- UPLOAD PANEL -->
+      <div id="panel-upload">
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--blue-dark)"><path d="M8 1a.5.5 0 01.354.146l3 3a.5.5 0 01-.708.708L8.5 2.707V10.5a.5.5 0 01-1 0V2.707L5.354 4.854a.5.5 0 11-.708-.708l3-3A.5.5 0 018 1z"/></svg>
+            <span class="card-title">Carregar Imagens DICOM</span>
+            <span class="card-subtitle" id="upload-status">Nenhuma imagem carregada</span>
+          </div>
+          <div class="card-body">
+            <div class="upload-zone" id="upload-zone"
+                 onclick="document.getElementById('file-input').click()"
+                 ondragover="ev(event,'over')" ondragleave="ev(event,'leave')" ondrop="ev(event,'drop')">
+              <div class="upload-icon">🫁</div>
+              <div class="upload-title">Arraste os arquivos aqui</div>
+              <div class="upload-sub">ou clique para selecionar do computador</div>
+              <div class="upload-formats" style="margin-top: 14px;">
+                <span class="format-tag">.DCM</span>
+                <span class="format-tag">.ZIP</span>
+              </div>
+            </div>
+            <input type="file" id="file-input" style="display:none" multiple accept=".dcm,.zip" onchange="handleFiles(this.files)">
+            <div class="progress-bar hidden" id="upload-progress-wrap">
+              <div class="progress-fill" id="upload-progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Image controls -->
+        <div class="controls-bar hidden" id="controls-bar">
+          <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Ajuste global</span>
+          <div class="ctrl-divider"></div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">☀ Brilho</span>
+            <input type="range" min="-100" max="100" value="0" step="1" id="sl-brightness" oninput="applyGlobal()">
+            <span class="ctrl-val" id="val-brightness">0</span>
+          </div>
+          <div class="ctrl-group">
+            <span class="ctrl-label">◎ Contraste</span>
+            <input type="range" min="30" max="300" value="100" step="5" id="sl-contrast" oninput="applyGlobal()">
+            <span class="ctrl-val" id="val-contrast">1.00×</span>
+          </div>
+          <div class="ctrl-divider"></div>
+          <button class="btn btn-sm" onclick="resetGlobal()">↺ Resetar</button>
+          <button class="btn btn-sm" onclick="autoEnhance()" style="color:var(--blue-dark); border-color:var(--blue-mid);">✦ Auto-melhorar</button>
+          <div class="flex-spacer"></div>
+          <button class="btn btn-sm btn-danger" onclick="clearAll()">🗑 Limpar</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-light); padding: 0 4px; margin-top:-8px; margin-bottom:4px;">
+          💡 Passe o mouse sobre uma imagem para excluir ou arrastar e reordenar
+        </div>
+
+        <div class="image-grid" id="image-grid"></div>
+
+        <div class="empty-state hidden" id="empty-images">
+          <div class="empty-icon">🖼</div>
+          <div class="empty-title">Nenhuma imagem</div>
+          <div>Carregue arquivos .dcm ou um .zip para começar</div>
+        </div>
+      </div>
+
+      <!-- REPORT PANEL -->
+      <div id="panel-report" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--blue-dark)"><path d="M5 4a.5.5 0 000 1h6a.5.5 0 000-1H5zm-.5 2.5A.5.5 0 015 6h6a.5.5 0 010 1H5a.5.5 0 01-.5-.5zM5 8a.5.5 0 000 1h6a.5.5 0 000-1H5zm0 2a.5.5 0 000 1h3a.5.5 0 000-1H5z"/><path d="M2 2a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V2zm10-1H4a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V2a1 1 0 00-1-1z"/></svg>
+            <span class="card-title">Dados do Laudo</span>
+          </div>
+          <div class="card-body">
+            <div class="report-layout">
+              <div>
+                <div class="form-grid">
+                  <div class="form-field full">
+                    <label class="form-label">Nome do Paciente *</label>
+                    <input class="form-input" type="text" id="f-patient" placeholder="Nome completo do paciente">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">Data de Nascimento</label>
+                    <input class="form-input" type="date" id="f-dob">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">Sexo</label>
+                    <select class="form-input" id="f-sex">
+                      <option value="">Não informado</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Feminino">Feminino</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">Data do Exame</label>
+                    <input class="form-input" type="date" id="f-date">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">Tipo de Exame</label>
+                    <input class="form-input" type="text" id="f-exam" placeholder="Ex: Ultrassonografia Abdominal">
+                  </div>
+                  <div class="form-field full">
+                    <label class="form-label">Clínica / Instituição</label>
+                    <input class="form-input" type="text" id="f-clinic" placeholder="Nome da clínica ou hospital">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">Médico Responsável</label>
+                    <input class="form-input" type="text" id="f-doctor" placeholder="Dr. Nome Sobrenome">
+                  </div>
+                  <div class="form-field">
+                    <label class="form-label">CRM</label>
+                    <input class="form-input" type="text" id="f-crm" placeholder="CRM/SP 000000">
+                  </div>
+                  <div class="form-field full">
+                    <label class="form-label">Achados / Descrição do Exame</label>
+                    <textarea class="form-input" id="f-findings" placeholder="Descreva detalhadamente os achados do exame..."></textarea>
+                  </div>
+                  <div class="form-field full">
+                    <label class="form-label">Conclusão / Impressão Diagnóstica</label>
+                    <textarea class="form-input" id="f-conclusion" placeholder="Conclusão e hipóteses diagnósticas..."></textarea>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button class="btn" onclick="updatePreview()">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.534 7h3.932a.25.25 0 01.192.41l-1.966 2.36a.25.25 0 01-.384 0l-1.966-2.36a.25.25 0 01.192-.41zm-11 2h3.932a.25.25 0 00.192-.41L2.692 6.23a.25.25 0 00-.384 0L.342 8.59A.25.25 0 00.534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 11-.771-.636A6.002 6.002 0 0113.917 7H12.9A5.002 5.002 0 008 3zM3.1 9a5.002 5.002 0 008.757 2.182.5.5 0 11.771.636A6.002 6.002 0 012.083 9H3.1z"/></svg>
+                    Atualizar prévia
+                  </button>
+                  <button class="btn btn-primary" id="btn-pdf" onclick="generatePDF()">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 01.5.5v2.5a1 1 0 001 1h12a1 1 0 001-1v-2.5a.5.5 0 011 0v2.5a2 2 0 01-2 2H2a2 2 0 01-2-2v-2.5a.5.5 0 01.5-.5z"/><path d="M7.646 11.854a.5.5 0 00.708 0l3-3a.5.5 0 00-.708-.708L8.5 10.293V1.5a.5.5 0 00-1 0v8.793L5.354 8.146a.5.5 0 10-.708.708l3 3z"/></svg>
+                    Gerar e Baixar PDF
+                  </button>
+                </div>
+              </div>
+
+              <!-- Preview -->
+              <div class="report-preview-wrap">
+                <div class="report-preview-label">Prévia do laudo</div>
+                <div class="report-preview" id="report-preview">
+                  <div class="rp-head">
+                    <div>
+                      <div class="rp-clinic-name" id="pv-clinic">Clínica</div>
+                      <div class="rp-exam-type" id="pv-exam">Laudo de Imagem</div>
+                    </div>
+                    <div class="rp-date-label" id="pv-date">—</div>
+                  </div>
+                  <div class="rp-patient-bar">
+                    <div class="rp-field">
+                      <div class="rp-field-key">Paciente</div>
+                      <div class="rp-field-val" id="pv-patient">—</div>
+                    </div>
+                    <div class="rp-field">
+                      <div class="rp-field-key">Nascimento</div>
+                      <div class="rp-field-val" id="pv-dob">—</div>
+                    </div>
+                    <div class="rp-field">
+                      <div class="rp-field-key">Sexo</div>
+                      <div class="rp-field-val" id="pv-sex">—</div>
+                    </div>
+                  </div>
+                  <div class="rp-images-grid" id="pv-images">
+                    <div style="grid-column:1/-1; padding: 16px; text-align:center; color:#aaa; font-family:sans-serif; font-size:12px;">
+                      Carregue imagens para visualizar
+                    </div>
+                  </div>
+                  <div class="rp-section">
+                    <div class="rp-section-title">Achados</div>
+                    <div class="rp-section-text" id="pv-findings">—</div>
+                  </div>
+                  <div class="rp-section">
+                    <div class="rp-section-title">Conclusão</div>
+                    <div class="rp-section-text" id="pv-conclusion">—</div>
+                  </div>
+                  <div class="rp-footer">
+                    <div class="rp-signature">
+                      <div class="rp-sig-line" id="pv-doctor">Médico Responsável</div>
+                      <div class="rp-sig-crm" id="pv-crm">CRM</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORY PANEL -->
+      <div id="panel-history" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--blue-dark)"><path d="M8.515 1.019A7 7 0 008 1V0a8 8 0 01.589.022l-.074.997zm2.004.45a7.003 7.003 0 00-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933z"/><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM4.5 7.5a.5.5 0 01.5-.5h2.5V4.5a.5.5 0 011 0v3a.5.5 0 01-.5.5H5a.5.5 0 01-.5-.5z"/></svg>
+            <span class="card-title">Laudos Gerados</span>
+            <span class="flex-spacer"></span>
+            <button class="btn btn-sm" onclick="loadHistory()">↺ Atualizar</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table class="db-table" id="history-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Paciente</th>
+                  <th>Exame</th>
+                  <th>Clínica</th>
+                  <th>Data</th>
+                  <th>Imagens</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="history-body">
+                <tr><td colspan="7" style="text-align:center; padding:32px; color:var(--text-muted);">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Image viewer modal -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal-img-wrap">
+    <button class="modal-close" onclick="document.getElementById('modal').classList.remove('open')">✕ Fechar</button>
+    <img id="modal-img" src="" alt="DICOM">
+    <div class="modal-controls">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.2);" onclick="modalPrev()">◀ Anterior</button>
+      <span id="modal-counter" style="font-size:13px;color:white;padding:6px 12px;">1 / 1</span>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:white;border-color:rgba(255,255,255,0.2);" onclick="modalNext()">Próximo ▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin + '/api';
+
+// State
+const images = [];  // { id, name, src, meta, originalSrc }
+let globalBrightness = 0;
+let globalContrast = 1.0;
+let modalIndex = 0;
+
+// Nav
+function goTo(panel) {
+  ['upload','report','history'].forEach(p => {
+    document.getElementById('panel-' + p).classList.toggle('hidden', p !== panel);
+    document.querySelectorAll('.nav-item').forEach((el, i) => {
+      el.classList.toggle('active', ['upload','report','history'][i] === panel);
+    });
+  });
+  if (panel === 'report') { autoFill(); updatePreview(); }
+  if (panel === 'history') loadHistory();
+}
+
+// Upload
+function ev(e, type) {
+  e.preventDefault();
+  const zone = document.getElementById('upload-zone');
+  if (type === 'over') zone.classList.add('drag');
+  else if (type === 'leave') zone.classList.remove('drag');
+  else if (type === 'drop') {
+    zone.classList.remove('drag');
+    handleFiles(e.dataTransfer.files);
+  }
+}
+
+async function handleFiles(files) {
+  if (!files.length) return;
+  const wrap = document.getElementById('upload-progress-wrap');
+  const bar = document.getElementById('upload-progress-bar');
+  wrap.classList.remove('hidden');
+
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+
+  try {
+    bar.style.width = '30%';
+    const res = await fetch(API + '/upload', { method: 'POST', body: fd });
+    bar.style.width = '80%';
+    const data = await res.json();
+
+    if (data.images && data.images.length) {
+      data.images.forEach(img => {
+        images.push({ id: img.id, name: img.name, src: img.imageData, originalSrc: img.imageData, meta: img.meta });
+      });
+      renderAllCards();
+      updateUI();
+      showToast(`${data.images.length} imagem(ns) carregada(s)`, 'success');
+    } else {
+      showToast('Nenhuma imagem DICOM encontrada', 'error');
+    }
+  } catch(e) {
+    showToast('Erro ao carregar: ' + e.message, 'error');
+  }
+
+  bar.style.width = '100%';
+  setTimeout(() => { wrap.classList.add('hidden'); bar.style.width = '0%'; }, 600);
+  document.getElementById('file-input').value = '';
+}
+
+// ── Drag-and-drop reorder ──────────────────────────────────────────────────
+let dragSrcIdx = null;
+
+function renderAllCards() {
+  const grid = document.getElementById('image-grid');
+  grid.innerHTML = '';
+  images.forEach((_, i) => renderCard(i));
+}
+
+function renderCard(idx) {
+  const obj = images[idx];
+  const grid = document.getElementById('image-grid');
+
+  const card = document.createElement('div');
+  card.className = 'img-card';
+  card.id = 'img-card-' + idx;
+  card.draggable = true;
+  card.dataset.idx = idx;
+
+  // Drag handle (top gradient strip)
+  const handle = document.createElement('div');
+  handle.className = 'img-drag-handle';
+  handle.title = 'Arraste para reordenar';
+  handle.innerHTML = `
+    <div class="drag-dots">
+      ${Array(9).fill('<span></span>').join('')}
+    </div>
+    <span class="img-order-badge">${idx + 1}</span>`;
+
+  // Delete button (top-right circle)
+  const delBtn = document.createElement('button');
+  delBtn.className = 'img-delete-btn';
+  delBtn.title = 'Remover imagem';
+  delBtn.innerHTML = '×';
+  delBtn.onclick = (e) => { e.stopPropagation(); removeImage(idx); };
+
+  // Image
+  const img = document.createElement('img');
+  img.src = obj.src;
+  img.alt = obj.name;
+  img.onclick = () => openModal(idx);
+
+  // Bottom bar
+  const bar = document.createElement('div');
+  bar.className = 'img-card-bar';
+  bar.innerHTML = `<span class="img-card-num">#${idx + 1}</span>
+    <span class="img-card-name" title="${obj.name}">${obj.name}</span>`;
+
+  card.appendChild(handle);
+  card.appendChild(delBtn);
+  card.appendChild(img);
+  card.appendChild(bar);
+
+  // Drag events
+  card.addEventListener('dragstart', (e) => {
+    dragSrcIdx = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', idx);
+    setTimeout(() => card.classList.add('dragging'), 0);
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    document.querySelectorAll('.img-card').forEach(c => c.classList.remove('drag-over'));
+  });
+  card.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.img-card').forEach(c => c.classList.remove('drag-over'));
+    if (dragSrcIdx !== idx) card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', (e) => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const fromIdx = dragSrcIdx;
+    const toIdx = idx;
+    if (fromIdx === null || fromIdx === toIdx) return;
+    // Reorder array
+    const moved = images.splice(fromIdx, 1)[0];
+    images.splice(toIdx, 0, moved);
+    renderAllCards();
+    updateUI();
+    showToast(`Imagem movida para posição ${toIdx + 1}`);
+  });
+
+  grid.appendChild(card);
+}
+
+function removeImage(idx) {
+  images.splice(idx, 1);
+  renderAllCards();
+  updateUI();
+}
+
+function updateUI() {
+  const count = images.length;
+  document.getElementById('img-badge').textContent = count + ' imagem' + (count !== 1 ? 'ns' : '');
+  document.getElementById('upload-status').textContent = count ? count + ' imagem(ns) carregada(s)' : 'Nenhuma imagem carregada';
+  document.getElementById('controls-bar').classList.toggle('hidden', count === 0);
+  document.getElementById('empty-images').classList.toggle('hidden', count > 0);
+  const navBadge = document.getElementById('nav-count');
+  if (count > 0) { navBadge.classList.remove('hidden'); navBadge.textContent = count; }
+  else navBadge.classList.add('hidden');
+}
+
+// Adjustments via API
+async function applyGlobal() {
+  globalBrightness = parseInt(document.getElementById('sl-brightness').value);
+  globalContrast = parseInt(document.getElementById('sl-contrast').value) / 100;
+  document.getElementById('val-brightness').textContent = globalBrightness;
+  document.getElementById('val-contrast').textContent = globalContrast.toFixed(2) + '×';
+
+  // Re-request adjusted images from backend
+  for (let i = 0; i < images.length; i++) {
+    try {
+      const res = await fetch(API + '/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dcmData: images[i].dcmB64 || null,
+          originalSrc: images[i].originalSrc,
+          brightness: globalBrightness,
+          contrast: globalContrast
+        })
+      });
+      const data = await res.json();
+      if (data.imageData) {
+        images[i].src = data.imageData;
+        const card = document.getElementById('img-card-' + i);
+        if (card) card.querySelector('img').src = data.imageData;
+      }
+    } catch(e) {}
+  }
+}
+
+async function autoEnhance() {
+  document.getElementById('sl-brightness').value = 15;
+  document.getElementById('sl-contrast').value = 140;
+  await applyGlobal();
+}
+
+function resetGlobal() {
+  document.getElementById('sl-brightness').value = 0;
+  document.getElementById('sl-contrast').value = 100;
+  document.getElementById('val-brightness').textContent = '0';
+  document.getElementById('val-contrast').textContent = '1.00×';
+  images.forEach((obj, i) => {
+    obj.src = obj.originalSrc;
+    const card = document.getElementById('img-card-' + i);
+    if (card) card.querySelector('img').src = obj.originalSrc;
+  });
+}
+
+function clearAll() {
+  if (images.length && !confirm('Remover todas as imagens?')) return;
+  images.length = 0;
+  document.getElementById('image-grid').innerHTML = '';
+  updateUI();
+}
+
+// Report
+function autoFill() {
+  if (!images.length) return;
+  const m = images[0].meta || {};
+  const fv = (id, val) => { const el = document.getElementById(id); if (el && !el.value && val) el.value = val; };
+  fv('f-patient', m.patientName);
+  fv('f-clinic', m.clinic);
+  fv('f-exam', m.studyDescription || 'Ultrassonografia');
+  if (m.studyDate && m.studyDate.length === 8 && !document.getElementById('f-date').value)
+    document.getElementById('f-date').value = m.studyDate.slice(0,4)+'-'+m.studyDate.slice(4,6)+'-'+m.studyDate.slice(6,8);
+  if (m.patientBirthDate && m.patientBirthDate.length === 8 && !document.getElementById('f-dob').value)
+    document.getElementById('f-dob').value = m.patientBirthDate.slice(0,4)+'-'+m.patientBirthDate.slice(4,6)+'-'+m.patientBirthDate.slice(6,8);
+  if (m.patientSex && !document.getElementById('f-sex').value) {
+    const sexMap = { M: 'Masculino', F: 'Feminino' };
+    document.getElementById('f-sex').value = sexMap[m.patientSex] || '';
+  }
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s + 'T00:00');
+  return d.toLocaleDateString('pt-BR');
+}
+
+function updatePreview() {
+  const g = id => document.getElementById(id).value;
+  document.getElementById('pv-clinic').textContent = g('f-clinic') || 'Clínica';
+  document.getElementById('pv-exam').textContent = g('f-exam') || 'Laudo de Imagem';
+  document.getElementById('pv-date').textContent = fmtDate(g('f-date'));
+  document.getElementById('pv-patient').textContent = g('f-patient') || '—';
+  document.getElementById('pv-dob').textContent = fmtDate(g('f-dob'));
+  document.getElementById('pv-sex').textContent = g('f-sex') || '—';
+  document.getElementById('pv-findings').textContent = g('f-findings') || '—';
+  document.getElementById('pv-conclusion').textContent = g('f-conclusion') || '—';
+  document.getElementById('pv-doctor').textContent = g('f-doctor') || 'Médico Responsável';
+  document.getElementById('pv-crm').textContent = g('f-crm') || 'CRM';
+
+  const pvImgs = document.getElementById('pv-images');
+  if (!images.length) {
+    pvImgs.innerHTML = '<div style="grid-column:1/-1;padding:16px;text-align:center;color:#aaa;font-family:sans-serif;font-size:12px;">Sem imagens carregadas</div>';
+    return;
+  }
+  pvImgs.innerHTML = images.slice(0, 4).map((obj, i) => `
+    <div class="rp-img-wrap">
+      <img src="${obj.src}" alt="Imagem ${i+1}">
+      <div class="rp-img-caption">Imagem ${i+1} — ${obj.name}</div>
+    </div>`).join('');
+}
+
+async function generatePDF() {
+  if (!images.length) { showToast('Adicione pelo menos uma imagem', 'error'); return; }
+  const btn = document.getElementById('btn-pdf');
+  btn.innerHTML = '<span class="spinner"></span> Gerando PDF...';
+  btn.disabled = true;
+
+  const g = id => document.getElementById(id).value;
+  try {
+    const payload = {
+      patientName: g('f-patient'),
+      patientDob: g('f-dob'),
+      patientSex: g('f-sex'),
+      studyDate: g('f-date'),
+      clinic: g('f-clinic'),
+      doctor: g('f-doctor'),
+      crm: g('f-crm'),
+      examType: g('f-exam'),
+      findings: g('f-findings'),
+      conclusion: g('f-conclusion'),
+      images: images.map(obj => obj.src)
+    };
+
+    const res = await fetch(API + '/generate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error('Erro no servidor');
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laudo_${(g('f-patient') || 'paciente').replace(/\s+/g,'_')}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('PDF gerado com sucesso!', 'success');
+  } catch(e) {
+    showToast('Erro ao gerar PDF: ' + e.message, 'error');
+  }
+
+  btn.innerHTML = `<svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px"><path d="M.5 9.9a.5.5 0 01.5.5v2.5a1 1 0 001 1h12a1 1 0 001-1v-2.5a.5.5 0 011 0v2.5a2 2 0 01-2 2H2a2 2 0 01-2-2v-2.5a.5.5 0 01.5-.5z"/><path d="M7.646 11.854a.5.5 0 00.708 0l3-3a.5.5 0 00-.708-.708L8.5 10.293V1.5a.5.5 0 00-1 0v8.793L5.354 8.146a.5.5 0 10-.708.708l3 3z"/></svg> Gerar e Baixar PDF`;
+  btn.disabled = false;
+}
+
+// History
+async function loadHistory() {
+  const tbody = document.getElementById('history-body');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">Carregando...</td></tr>';
+  try {
+    const res = await fetch(API + '/laudos');
+    const data = await res.json();
+    if (!data.laudos.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted);">Nenhum laudo gerado ainda</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.laudos.map(r => `
+      <tr>
+        <td style="color:var(--text-muted)">#${r.id}</td>
+        <td><span class="status-dot"></span>${r.patient_name || '—'}</td>
+        <td>${r.exam_type || '—'}</td>
+        <td>${r.clinic || '—'}</td>
+        <td>${r.study_date ? fmtDateStr(r.study_date) : '—'}</td>
+        <td>${r.num_images}</td>
+        <td style="display:flex;gap:6px;">
+          <a href="${API}/laudos/${r.id}/pdf" class="btn btn-sm" download>↓ PDF</a>
+          <button class="btn btn-sm btn-danger" onclick="deleteLaudo(${r.id})">Excluir</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger);">Erro ao conectar com servidor</td></tr>';
+  }
+}
+
+function fmtDateStr(s) {
+  if (!s) return '—';
+  if (s.includes('-')) return new Date(s + 'T00:00').toLocaleDateString('pt-BR');
+  if (s.length === 8) return `${s.slice(6,8)}/${s.slice(4,6)}/${s.slice(0,4)}`;
+  return s;
+}
+
+async function deleteLaudo(id) {
+  if (!confirm('Excluir este laudo permanentemente?')) return;
+  await fetch(API + '/laudos/' + id, { method: 'DELETE' });
+  loadHistory();
+  showToast('Laudo excluído');
+}
+
+// Modal
+function openModal(idx) {
+  modalIndex = idx;
+  document.getElementById('modal-img').src = images[idx].src;
+  document.getElementById('modal-counter').textContent = `${idx + 1} / ${images.length}`;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(e) {
+  if (e.target === document.getElementById('modal')) document.getElementById('modal').classList.remove('open');
+}
+function modalPrev() {
+  modalIndex = (modalIndex - 1 + images.length) % images.length;
+  openModal(modalIndex);
+}
+function modalNext() {
+  modalIndex = (modalIndex + 1) % images.length;
+  openModal(modalIndex);
+}
+
+// Toast
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modal').classList.remove('open');
+  if (document.getElementById('modal').classList.contains('open')) {
+    if (e.key === 'ArrowLeft') modalPrev();
+    if (e.key === 'ArrowRight') modalNext();
+  }
+});
+
+// Init
+updateUI();
+</script>
+</body>
+</html>
